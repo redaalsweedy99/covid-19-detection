@@ -1,0 +1,113 @@
+import keras
+from keras import backend as K
+from keras.models import Model
+from keras.layers import Flatten, Dense
+from keras.applications.vgg16 import VGG16
+import os
+import cv2
+import glob
+from sklearn.model_selection import train_test_split
+import pandas as pd
+import tensorflow as tf
+from keras.layers import Dense
+from tensorflow.keras.layers import Conv2D, Flatten, MaxPool2D, Dropout, BatchNormalization ,Activation , MaxPooling2D
+from keras.models import Sequential
+from keras import layers as ls
+from keras.models import Model 
+from keras.applications.inception_v3 import InceptionV3
+from keras.layers import concatenate
+from keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard, ReduceLROnPlateau
+import numpy as np 
+
+df= pd.read_csv('.csv',encoding='latin-1')
+y=df['labels']
+
+img_dir = ""
+data_path = os.path.join(img_dir,'*.png')
+files = glob.glob(data_path)
+images=[]
+dim=(150,150)
+for f1 in files:
+    img = cv2.imread(f1)
+    resized = cv2.resize(img , dim , interpolation = cv2.INTER_AREA)
+    images.append(resized)
+
+X_train, X_test, y_train, y_test = train_test_split(images, y, test_size=0.2, random_state=1)
+
+X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.25, random_state=1)
+
+
+base_model = VGG16(weights='imagenet', include_top=False, input_shape=(150, 150, 3))
+
+x = base_model.output
+x = ls.Flatten()(x)
+x = Dense(6, activation='softmax')(x)
+
+model = Model(inputs=base_model.input, outputs=x)
+
+model.summary()
+
+for layer in model.layers[0:20]:
+    layer.trainable = False
+    
+    
+early = EarlyStopping(monitor = 'val_accuracy', min_delta = 0, 
+                      patience = 10, verbose= 1 , mode = 'auto')
+
+
+model.compile(optimizer='adam',
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
+
+
+
+
+model.fit(
+    np.array(X_train), y_train,
+    shuffle=True,
+    batch_size=64,
+    epochs=5,
+    verbose=1,
+    validation_data=(np.array(X_val),y_val),
+    callbacks = [early]
+)
+
+
+model.evaluate(np.array(X_test),y_test)
+y_pred=model.predict(np.array(X_test))
+
+
+
+
+
+#     base_model = InceptionV3(weights=None, include_top=False)
+base_model1 = InceptionV3(weights='imagenet', include_top=False, input_shape=(150, 150, 3))
+
+xx = base_model1.output
+xx = ls.Flatten()(xx)  
+predictions = ls.Dense(3, activation='softmax')(xx) 
+    
+    
+model1 = Model(inputs=base_model1.input, outputs=predictions)
+    
+    
+for layer in base_model.layers:
+   layer.trainable = False
+
+           
+model1.summary()
+
+
+model1.compile(optimizer='adam',
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
+
+model1.fit(
+    np.array(X_train), y_train,
+    shuffle=True,
+    batch_size=64,
+    epochs=5,
+    verbose=1,
+    validation_data=(np.array(X_val),y_val),
+    callbacks = [early]
+)
